@@ -15,8 +15,9 @@ import (
 const (
 	screenWidth  = 800
 	screenHeight = 800
-	imgWidth     = 1024
-	imgHeight    = 1024
+	mapWidth     = 1024
+	mapHeight    = 1024
+	renderDist   = 1024
 
 	mapCount  = 14
 	assetsDir = `.\maps\`
@@ -70,7 +71,7 @@ func NewGame() *Game {
 	return &Game{
 		mapID:  0,
 		player: Player{x: 512, y: 512},
-		plMove: false,
+		plMove: true,
 		pixels: make([]byte, screenHeight*screenWidth*4),
 	}
 }
@@ -84,11 +85,27 @@ func (g *Game) Update() error {
 		g.mapID = (g.mapID + 1) % mapCount
 		g.plMove = true
 	}
+	if ebiten.IsKeyPressed(ebiten.KeyW) {
+		g.player.y++
+		g.plMove = true
+	}
+	if ebiten.IsKeyPressed(ebiten.KeyS) {
+		g.player.y--
+		g.plMove = true
+	}
+	if ebiten.IsKeyPressed(ebiten.KeyA) {
+		g.player.x--
+		g.plMove = true
+	}
+	if ebiten.IsKeyPressed(ebiten.KeyD) {
+		g.player.x++
+		g.plMove = true
+	}
 	return nil
 }
 
-func (g *Game) getDepth(x, y float64) float64 {
-	d := depthMaps[g.mapID].At(int(x), int(y))
+func (g *Game) getDepth(x, y int) float64 {
+	d := depthMaps[g.mapID].At(x, y)
 	R, _, _, _ := d.RGBA()
 	return float64(0xff * R / 0xffff)
 }
@@ -97,24 +114,26 @@ func (g *Game) DrawMap() {
 	height := float64(255 * 5 / 5)
 	horizon := float64(screenHeight / 3)
 	scale_height := 240.0
-	distance := float64(imgHeight * 2.2 / 5)
 
 	ybuffer := [screenWidth]float64{}
 	for i := range ybuffer {
 		ybuffer[i] = screenHeight
 	}
 
-	dz := 0.01
-	for z := 1.0; z <= distance; z += dz {
+	dz := 0.02
+	for z := 1.0; z <= renderDist; z += dz {
 		plx, ply := -z+g.player.x, z+g.player.y
 		prx := z + g.player.x
 		dx := (prx - plx) / screenHeight
-		// log.Println(z, int(plx), ply, prx, dx)
+
 		for i := 0; i < screenWidth; i++ {
-			depth := g.getDepth(plx, ply)
+			// for repeating map
+			ix, iy := int(plx)&(mapHeight-1), int(ply)&(mapWidth-1)
+
+			depth := g.getDepth(ix, iy)
 			heightOnScreen := horizon + (height-depth)/z*scale_height
 
-			c := colorMaps[g.mapID].At(int(plx), int(ply))
+			c := colorMaps[g.mapID].At(ix, iy)
 			g.DrawVerticalLine(i, int(heightOnScreen), int(ybuffer[i]), c)
 			if heightOnScreen <= ybuffer[i] {
 				ybuffer[i] = heightOnScreen
