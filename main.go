@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"image/color"
 	"log"
+	"math"
 	"regexp"
 	"strconv"
 
@@ -61,45 +62,57 @@ type Game struct {
 	pixels []byte
 }
 
-type Player struct {
-	x float64
-	y float64
-	// phi float64
-}
-
 func NewGame() *Game {
 	return &Game{
-		mapID:  0,
-		player: Player{x: 512, y: 512},
+		mapID: 0,
+		player: Player{
+			x:       512,
+			y:       512,
+			phi:     math.Pi / 4,
+			height:  255,
+			horizon: float64(screenHeight / 2),
+		},
 		plMove: true,
 		pixels: make([]byte, screenHeight*screenWidth*4),
 	}
 }
 
 func (g *Game) Update() error {
-	if inpututil.IsKeyJustPressed(ebiten.KeyQ) {
+	if inpututil.IsKeyJustPressed(ebiten.KeyM) {
 		g.mapID = (mapCount + g.mapID - 1) % mapCount
 		g.plMove = true
 	}
-	if inpututil.IsKeyJustPressed(ebiten.KeyE) {
+	if inpututil.IsKeyJustPressed(ebiten.KeyN) {
 		g.mapID = (g.mapID + 1) % mapCount
 		g.plMove = true
 	}
 	if ebiten.IsKeyPressed(ebiten.KeyW) {
-		g.player.y++
-		g.plMove = true
+		g.player.Move(10.0)
 	}
 	if ebiten.IsKeyPressed(ebiten.KeyS) {
-		g.player.y--
-		g.plMove = true
+		g.player.Move(-9.0)
 	}
 	if ebiten.IsKeyPressed(ebiten.KeyA) {
-		g.player.x--
-		g.plMove = true
+		g.player.Rotate(0.03)
 	}
 	if ebiten.IsKeyPressed(ebiten.KeyD) {
-		g.player.x++
+		g.player.Rotate(-0.03)
+	}
+	if ebiten.IsKeyPressed(ebiten.KeyQ) {
+		g.player.ChangePitch(10.0)
+	}
+	if ebiten.IsKeyPressed(ebiten.KeyE) {
+		g.player.ChangePitch(-9.0)
+	}
+	if ebiten.IsKeyPressed(ebiten.KeyR) {
+		g.player.ChangeHeight(10.0)
+	}
+	if ebiten.IsKeyPressed(ebiten.KeyF) {
+		g.player.ChangeHeight(-9.0)
+	}
+	if g.player.moved {
 		g.plMove = true
+		g.player.moved = false
 	}
 	return nil
 }
@@ -111,8 +124,8 @@ func (g *Game) getDepth(x, y int) float64 {
 }
 
 func (g *Game) DrawMap() {
-	height := float64(255 * 5 / 5)
-	horizon := float64(screenHeight / 3)
+	height := g.player.height
+	horizon := g.player.horizon
 	scale_height := 240.0
 
 	ybuffer := [screenWidth]float64{}
@@ -120,12 +133,19 @@ func (g *Game) DrawMap() {
 		ybuffer[i] = screenHeight
 	}
 
-	dz := 0.02
+	psin, pcos := math.Sincos(g.player.phi)
+	dz := 1.0
 	for z := 1.0; z <= renderDist; z += dz {
-		plx, ply := -z+g.player.x, z+g.player.y
-		prx := z + g.player.x
-		dx := (prx - plx) / screenHeight
+		plx := -pcos*z - psin*z
+		ply := psin*z - pcos*z
+		prx := pcos*z - psin*z
+		pry := -psin*z - pcos*z
 
+		dx := (prx - plx) / screenWidth
+		dy := (pry - ply) / screenHeight
+		// add player coords after as it doesn't matter. they cancel out
+		plx += g.player.x
+		ply += g.player.y
 		for i := 0; i < screenWidth; i++ {
 			// for repeating map
 			ix, iy := int(plx)&(mapHeight-1), int(ply)&(mapWidth-1)
@@ -139,8 +159,9 @@ func (g *Game) DrawMap() {
 				ybuffer[i] = heightOnScreen
 			}
 			plx += dx
+			ply += dy
 		}
-		dz += 0.01
+		dz += 0.005
 	}
 }
 
@@ -165,7 +186,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	if g.plMove {
 
 		for i := range g.pixels {
-			g.pixels[i] = 0xf0
+			g.pixels[i] = 0xe0
 		}
 		log.Println("DRAW - START - MAP:", g.mapID)
 		g.DrawMap()
@@ -175,7 +196,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	// screen.Fill(color.RGBA{245, 245, 245, 245})
 	screen.WritePixels(g.pixels)
 
-	msg := fmt.Sprintf("FPS: %0.0f, TPS: %0.0f\nMap(%d): QE",
+	msg := fmt.Sprintf("FPS: %0.0f, TPS: %0.0f\nMap(%d): MN\nMOVE: WASD\n Pitch: QE\nHeight: RF",
 		ebiten.ActualFPS(), ebiten.ActualTPS(), g.mapID)
 	ebitenutil.DebugPrint(screen, msg)
 }
