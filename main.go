@@ -18,7 +18,6 @@ const (
 	screenHeight = 800
 	mapWidth     = 1024
 	mapHeight    = 1024
-	renderDist   = 1024
 
 	mapCount  = 14
 	assetsDir = `.\maps\`
@@ -56,10 +55,11 @@ func init() {
 }
 
 type Game struct {
-	mapID  int
-	player Player
-	plMove bool
-	pixels []byte
+	mapID      int
+	player     Player
+	plMove     bool
+	pixels     []byte
+	renderDist int
 }
 
 func NewGame() *Game {
@@ -72,8 +72,15 @@ func NewGame() *Game {
 			height:  255,
 			horizon: float64(screenHeight / 2),
 		},
-		plMove: true,
-		pixels: make([]byte, screenHeight*screenWidth*4),
+		plMove:     true,
+		pixels:     make([]byte, screenHeight*screenWidth*4),
+		renderDist: 500,
+	}
+}
+
+func (g *Game) UpdateRenderDist(dr int) {
+	if g.renderDist+dr > 0 && g.renderDist+dr <= 1000 {
+		g.renderDist += dr
 	}
 }
 
@@ -110,6 +117,12 @@ func (g *Game) Update() error {
 	if ebiten.IsKeyPressed(ebiten.KeyF) {
 		g.player.ChangeHeight(-9.0)
 	}
+	if inpututil.IsKeyJustPressed(ebiten.KeyC) {
+		g.UpdateRenderDist(-50)
+	}
+	if inpututil.IsKeyJustPressed(ebiten.KeyV) {
+		g.UpdateRenderDist(50)
+	}
 	if g.player.moved {
 		g.plMove = true
 		g.player.moved = false
@@ -135,7 +148,7 @@ func (g *Game) DrawMap() {
 
 	psin, pcos := math.Sincos(g.player.phi)
 	dz := 1.0
-	for z := 1.0; z <= renderDist; z += dz {
+	for z := 1.0; z <= float64(g.renderDist); z += dz {
 		plx := -pcos*z - psin*z
 		ply := psin*z - pcos*z
 		prx := pcos*z - psin*z
@@ -184,20 +197,18 @@ func (g *Game) DrawVerticalLine(x, ytop, ybot int, col color.Color) {
 
 func (g *Game) Draw(screen *ebiten.Image) {
 	if g.plMove {
-
 		for i := range g.pixels {
 			g.pixels[i] = 0xe0
 		}
-		log.Println("DRAW - START - MAP:", g.mapID)
+		// log.Println("DRAW - START - MAP:", g.mapID)
 		g.DrawMap()
-		log.Println("DRAW - COMPLETE - MAP:", g.mapID)
+		// log.Println("DRAW - COMPLETE - MAP:", g.mapID)
 		g.plMove = false
 	}
-	// screen.Fill(color.RGBA{245, 245, 245, 245})
 	screen.WritePixels(g.pixels)
 
-	msg := fmt.Sprintf("FPS: %0.0f, TPS: %0.0f\nMap(%d): MN\nMOVE: WASD\n Pitch: QE\nHeight: RF",
-		ebiten.ActualFPS(), ebiten.ActualTPS(), g.mapID)
+	msg := fmt.Sprintf("FPS: %0.0f, TPS: %0.0f\nMap(%d): MN\nMOVE: WASD\n Pitch: QE\nHeight: RF\nRenderDist(%d) CV",
+		ebiten.ActualFPS(), ebiten.ActualTPS(), g.mapID, g.renderDist)
 	ebitenutil.DebugPrint(screen, msg)
 }
 
