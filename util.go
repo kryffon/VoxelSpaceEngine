@@ -43,3 +43,7 @@ func loadImage(filePath string) (*ebiten.Image, error) {
 	}
 	return ebiten.NewImageFromImage(img), nil
 }
+
+func uint32ToByte(u uint32) byte {
+	return byte(0xff * u / 0xffff)
+}
