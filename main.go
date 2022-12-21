@@ -13,8 +13,8 @@ import (
 )
 
 const (
-	screenWidth  = 400
-	screenHeight = 400
+	screenWidth  = 800
+	screenHeight = 800
 	imgWidth     = 1024
 	imgHeight    = 1024
 
@@ -28,6 +28,8 @@ var (
 )
 
 func init() {
+	log.SetFlags(log.LstdFlags | log.Lmicroseconds)
+
 	filenames, err := getFileNames(assetsDir)
 	if err != nil {
 		panic(err)
@@ -59,9 +61,9 @@ type Game struct {
 }
 
 type Player struct {
-	x   float64
-	y   float64
-	phi float64
+	x float64
+	y float64
+	// phi float64
 }
 
 func NewGame() *Game {
@@ -85,39 +87,52 @@ func (g *Game) Update() error {
 	return nil
 }
 
+func (g *Game) getDepth(x, y float64) float64 {
+	d := depthMaps[g.mapID].At(int(x), int(y))
+	R, _, _, _ := d.RGBA()
+	return float64(0xff * R / 0xffff)
+}
+
 func (g *Game) DrawMap() {
 	height := float64(255 * 5 / 5)
 	horizon := float64(screenHeight / 3)
 	scale_height := 240.0
 	distance := float64(imgHeight * 2.2 / 5)
-	for z := distance; z >= 1; z-- {
+
+	ybuffer := [screenWidth]float64{}
+	for i := range ybuffer {
+		ybuffer[i] = screenHeight
+	}
+
+	dz := 0.01
+	for z := 1.0; z <= distance; z += dz {
 		plx, ply := -z+g.player.x, z+g.player.y
 		prx := z + g.player.x
 		dx := (prx - plx) / screenHeight
 		// log.Println(z, int(plx), ply, prx, dx)
 		for i := 0; i < screenWidth; i++ {
-			d := depthMaps[g.mapID].At(int(plx), int(ply))
+			depth := g.getDepth(plx, ply)
+			heightOnScreen := horizon + (height-depth)/z*scale_height
+
 			c := colorMaps[g.mapID].At(int(plx), int(ply))
-			R, _, _, _ := d.RGBA()
-			Rb := uint32ToByte(R)
-			heightOnScreen := horizon + (height-float64(Rb))/z*scale_height
-			// if i == screenWidth/2 {
-			// 	log.Println(z, i, int(heightOnScreen), Rb, d)
-			// }
-			g.DrawVerticalLine(i, int(heightOnScreen), screenHeight, c)
+			g.DrawVerticalLine(i, int(heightOnScreen), int(ybuffer[i]), c)
+			if heightOnScreen <= ybuffer[i] {
+				ybuffer[i] = heightOnScreen
+			}
 			plx += dx
 		}
+		dz += 0.01
 	}
 }
 
 func (g *Game) DrawVerticalLine(x, ytop, ybot int, col color.Color) {
-	R, G, B, A := col.RGBA()
 	if ytop < 0 {
 		ytop = 0
 	}
 	if ytop > ybot {
 		return
 	}
+	R, G, B, A := col.RGBA()
 	for y := ytop; y < ybot; y++ {
 		i := y*screenWidth + x
 		g.pixels[4*i] = uint32ToByte(R)
@@ -129,10 +144,13 @@ func (g *Game) DrawVerticalLine(x, ytop, ybot int, col color.Color) {
 
 func (g *Game) Draw(screen *ebiten.Image) {
 	if g.plMove {
+
 		for i := range g.pixels {
-			g.pixels[i] = 0
+			g.pixels[i] = 0xf0
 		}
+		log.Println("DRAW - START - MAP:", g.mapID)
 		g.DrawMap()
+		log.Println("DRAW - COMPLETE - MAP:", g.mapID)
 		g.plMove = false
 	}
 	// screen.Fill(color.RGBA{245, 245, 245, 245})

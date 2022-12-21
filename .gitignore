@@ -2,3 +2,5 @@
 *.code-workspace
 .vscode
 .vscode/*
+log
+log/*
