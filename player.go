@@ -14,10 +14,10 @@ type Player struct {
 func (p *Player) Rotate(dphi float64) {
 	p.phi += dphi
 	if p.phi < 0 {
-		p.phi += math.Pi
+		p.phi += 2*math.Pi
 	}
 	if p.phi > 2*math.Pi {
-		p.phi -= math.Pi
+		p.phi -= 2*math.Pi
 	}
 	p.moved = true
 }
